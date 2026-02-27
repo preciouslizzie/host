@@ -32,6 +32,11 @@ class AdminAuthController extends Controller
     ], 201);
 }
 
+public function getUsers()
+{
+    return response()->json(User::all());
+}
+
 public function createAdmin(Request $request)
 {
     if ($request->user()->role !== 'super_admin') {

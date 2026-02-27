@@ -26,10 +26,11 @@ Route::prefix('api')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->post('/admin/create-admin', [AdminAuthController::class, 'createAdmin']);
+    Route::middleware('auth:sanctum')->get('/admin/users', [AdminAuthController::class, 'getUsers']);
     //Route::post('/admin/register', [AdminAuthController::class, 'register']);
     Route::middleware('auth:sanctum')->post('/admin/register', [AdminAuthController::class, 'register']);
     Route::post('/admin/login', [AdminAuthController::class, 'login']);
-    Route::post('/admin/create-user', [AdminAuthController::class, 'createAdmin']);
+    Route::post('/admin/create-user', [AdminAuthController::class, 'createUser']);
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 
     // ------------------- PASSWORD RESET -------------------

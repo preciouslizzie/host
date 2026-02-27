@@ -9,7 +9,7 @@ class AdminMiddleware
 {
     public function handle(Request $request, Closure $next)
     {
-        if (auth()->user()?->role !== 'admin') {
+        if (!in_array(auth()->user()?->role, ['admin', 'super_admin'], true)) {
             return response()->json([
                 'message' => 'Unauthorized'
             ], 403);

@@ -8,7 +8,8 @@ class VolunteerRole extends Model
 {
     protected $fillable = [
         'name',
-        'availability_required'
+        'availability_required',
+        'availability'
     ];
 
     public function users()
