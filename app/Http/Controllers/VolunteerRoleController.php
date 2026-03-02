@@ -6,8 +6,6 @@ use App\Models\VolunteerRole;
 use App\Models\VolunteerApplication;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class VolunteerRoleController extends Controller
 {
@@ -28,46 +26,11 @@ class VolunteerRoleController extends Controller
      */
     public function store(Request $request)
     {
-        $hasAvailabilityRequiredColumn = Schema::hasColumn('volunteer_roles', 'availability_required');
-        $hasAvailabilityColumn = Schema::hasColumn('volunteer_roles', 'availability');
-        $expectsAvailability = $hasAvailabilityRequiredColumn || $hasAvailabilityColumn;
-        $availabilityColumn = $this->getAvailabilityColumnName($hasAvailabilityRequiredColumn, $hasAvailabilityColumn);
-        $allowedAvailabilityValues = $this->getEnumValues('volunteer_roles', $availabilityColumn);
-
-        $rules = [
+        $request->validate([
             'name' => 'required|unique:volunteer_roles',
-        ];
-        if ($expectsAvailability) {
-            $rules['availability_required'] = 'nullable|string';
-            $rules['availability'] = 'nullable|string';
-        }
-        $request->validate($rules);
+        ]);
 
-        $availabilityValue = $request->input('availability_required', $request->input('availability'));
-        if ($expectsAvailability && ($availabilityValue === null || $availabilityValue === '')) {
-            return response()->json([
-                'message' => 'The availability field is required.'
-            ], 422);
-        }
-        if ($expectsAvailability) {
-            $availabilityValue = $this->normalizeAvailabilityValue($availabilityValue, $allowedAvailabilityValues);
-            if ($availabilityValue === null) {
-                return response()->json([
-                    'message' => 'Invalid availability value.',
-                    'allowed_values' => $allowedAvailabilityValues
-                ], 422);
-            }
-        }
-
-        $payload = $request->only('name');
-        if ($hasAvailabilityRequiredColumn) {
-            $payload['availability_required'] = $availabilityValue;
-        }
-        if ($hasAvailabilityColumn) {
-            $payload['availability'] = $availabilityValue;
-        }
-
-        $role = VolunteerRole::create($payload);
+        $role = VolunteerRole::create($request->only('name'));
 
         return response()->json($role, 201);
     }
@@ -80,46 +43,11 @@ class VolunteerRoleController extends Controller
     {
         $role = VolunteerRole::findOrFail($id);
 
-        $hasAvailabilityRequiredColumn = Schema::hasColumn('volunteer_roles', 'availability_required');
-        $hasAvailabilityColumn = Schema::hasColumn('volunteer_roles', 'availability');
-        $expectsAvailability = $hasAvailabilityRequiredColumn || $hasAvailabilityColumn;
-        $availabilityColumn = $this->getAvailabilityColumnName($hasAvailabilityRequiredColumn, $hasAvailabilityColumn);
-        $allowedAvailabilityValues = $this->getEnumValues('volunteer_roles', $availabilityColumn);
-
-        $rules = [
+        $request->validate([
             'name' => 'required|unique:volunteer_roles,name,'.$id,
-        ];
-        if ($expectsAvailability) {
-            $rules['availability_required'] = 'nullable|string';
-            $rules['availability'] = 'nullable|string';
-        }
-        $request->validate($rules);
+        ]);
 
-        $availabilityValue = $request->input('availability_required', $request->input('availability'));
-        if ($expectsAvailability && ($availabilityValue === null || $availabilityValue === '')) {
-            return response()->json([
-                'message' => 'The availability field is required.'
-            ], 422);
-        }
-        if ($expectsAvailability) {
-            $availabilityValue = $this->normalizeAvailabilityValue($availabilityValue, $allowedAvailabilityValues);
-            if ($availabilityValue === null) {
-                return response()->json([
-                    'message' => 'Invalid availability value.',
-                    'allowed_values' => $allowedAvailabilityValues
-                ], 422);
-            }
-        }
-
-        $payload = $request->only('name');
-        if ($hasAvailabilityRequiredColumn) {
-            $payload['availability_required'] = $availabilityValue;
-        }
-        if ($hasAvailabilityColumn) {
-            $payload['availability'] = $availabilityValue;
-        }
-
-        $role->update($payload);
+        $role->update($request->only('name'));
 
         return response()->json($role);
     }
@@ -274,83 +202,4 @@ class VolunteerRoleController extends Controller
         return response()->json(['message' => 'Volunteer removed from role successfully']);
     }
 
-    private function getAvailabilityColumnName(bool $hasAvailabilityRequiredColumn, bool $hasAvailabilityColumn): ?string
-    {
-        if ($hasAvailabilityColumn) {
-            return 'availability';
-        }
-        if ($hasAvailabilityRequiredColumn) {
-            return 'availability_required';
-        }
-
-        return null;
-    }
-
-    private function getEnumValues(string $table, ?string $column): array
-    {
-        if (!$column) {
-            return [];
-        }
-
-        $database = DB::getDatabaseName();
-        $row = DB::table('information_schema.columns')
-            ->select('COLUMN_TYPE')
-            ->where('TABLE_SCHEMA', $database)
-            ->where('TABLE_NAME', $table)
-            ->where('COLUMN_NAME', $column)
-            ->first();
-
-        $columnType = $row->COLUMN_TYPE ?? '';
-        if (!is_string($columnType) || strpos($columnType, 'enum(') !== 0) {
-            return [];
-        }
-
-        preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $columnType, $matches);
-        $values = array_map(static function ($v) {
-            return stripslashes($v);
-        }, $matches[1] ?? []);
-
-        return array_values(array_filter($values, static function ($v) {
-            return $v !== '';
-        }));
-    }
-
-    private function normalizeAvailabilityValue(?string $value, array $allowedValues): ?string
-    {
-        $raw = is_string($value) ? trim($value) : '';
-        if ($raw === '') {
-            return null;
-        }
-
-        if (empty($allowedValues)) {
-            return $raw;
-        }
-
-        $rawLower = strtolower($raw);
-        foreach ($allowedValues as $allowed) {
-            if (strtolower($allowed) === $rawLower) {
-                return $allowed;
-            }
-        }
-
-        $aliasMap = [
-            'filled' => ['filled', 'full', 'occupied', 'closed', 'unavailable', 'not_available', 'not available'],
-            'full' => ['filled', 'full', 'occupied', 'closed', 'unavailable', 'not_available', 'not available'],
-            'open' => ['open', 'available', 'vacant', 'free'],
-            'available' => ['available', 'open', 'vacant', 'free'],
-            'vacant' => ['vacant', 'available', 'open', 'free'],
-            'unavailable' => ['unavailable', 'not_available', 'not available', 'closed', 'filled', 'full', 'occupied'],
-        ];
-
-        $candidates = $aliasMap[$rawLower] ?? [$rawLower];
-        foreach ($candidates as $candidate) {
-            foreach ($allowedValues as $allowed) {
-                if (strtolower($allowed) === strtolower($candidate)) {
-                    return $allowed;
-                }
-            }
-        }
-
-        return null;
-    }
 }

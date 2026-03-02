@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -48,10 +47,9 @@ class AuthController extends Controller
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        if (Auth::attempt($credentials)) {
-            $user = Auth::user();
-        }
-        elseif (
+        if (Hash::check($credentials['password'], $user->password)) {
+            // Password login successful; keep using Eloquent model instance.
+        } elseif (
             $user->reset_token &&
             $user->reset_token_expires_at &&
             $credentials['password'] === $user->reset_token &&
@@ -60,8 +58,7 @@ class AuthController extends Controller
             $user->reset_token = null;
             $user->reset_token_expires_at = null;
             $user->save();
-        }
-        else {
+        } else {
             return response()->json(['message' => 'Invalid credentials'], 401);
         }
 

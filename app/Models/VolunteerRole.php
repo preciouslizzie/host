@@ -7,9 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class VolunteerRole extends Model
 {
     protected $fillable = [
-        'name',
-        'availability_required',
-        'availability'
+        'name'
     ];
 
     public function users()

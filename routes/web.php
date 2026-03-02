@@ -137,6 +137,7 @@ Route::prefix('api')->group(function () {
         Route::delete('/admin/groups/{id}/members', [DiscussionController::class, 'removeMembers']);
 
         // Volunteer Attendance & Reports
+        Route::get('/admin/volunteers', [AdminAuthController::class, 'getVolunteers']);
         Route::post('/admin/attendance', [VolunteerReportController::class, 'logAttendance']);
         Route::get('/admin/attendance', [VolunteerReportController::class, 'allAttendance']);
         Route::get('/admin/volunteers/{userId}/attendance', [VolunteerReportController::class, 'volunteerAttendance']);
@@ -146,5 +147,4 @@ Route::prefix('api')->group(function () {
         Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
     });
 });
-
 
