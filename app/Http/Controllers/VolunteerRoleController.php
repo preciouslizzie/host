@@ -142,29 +142,28 @@ class VolunteerRoleController extends Controller
     {
         $application = VolunteerApplication::findOrFail($id);
 
-        $request->validate([
-        'status' => 'required|in:approved,rejected'
-    ]);
+        $status = $request->input(
+            'status',
+            $request->input('application_status', $request->input('decision'))
+        );
+        if (!in_array($status, ['approved', 'rejected'], true)) {
+            return response()->json([
+                'message' => 'The status field is required and must be approved or rejected.',
+                'accepted_payload_keys' => ['status', 'application_status', 'decision']
+            ], 422);
+        }
 
-    $application->status = $request->status;
-    $application->save();
-
-    return response()->json([
-        'message' => 'Application updated successfully',
-        'application' => $application
-    ]);
-
-        $application->update(['status' => $request->status]);
+        $application->update(['status' => $status]);
 
         // If approved, add to volunteer_role_user pivot table
-        if ($request->status === 'approved') {
-            $application->volunteer->volunteerRoles()->attach(
+        if ($status === 'approved') {
+            $application->volunteer->volunteerRoles()->syncWithoutDetaching([
                 $application->role_id
-            );
+            ]);
         }
 
         return response()->json([
-            'message' => "Application {$request->status} successfully",
+            'message' => "Application {$status} successfully",
             'data' => $application
         ]);
     }

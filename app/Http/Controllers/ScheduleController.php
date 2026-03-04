@@ -6,6 +6,7 @@ use App\Models\Schedule;
 use App\Models\VolunteerRole;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Carbon\Carbon; // ADDED
 
 class ScheduleController extends Controller
@@ -23,7 +24,7 @@ class ScheduleController extends Controller
 
         $schedules = Schedule::where('user_id', $userId)
             ->with(['role:id,name', 'attendanceLogs'])
-            ->orderBy('date')
+            ->orderBy($this->getScheduleOrderColumn(), 'asc')
             ->get();
 
         // ADDED: convert to 12 hour format
@@ -40,7 +41,7 @@ class ScheduleController extends Controller
     public function index()
     {
         $schedules = Schedule::with(['volunteer:id,name,email', 'role:id,name'])
-            ->orderBy('date')
+            ->orderBy($this->getScheduleOrderColumn(), 'asc')
             ->paginate(20);
 
         // ADDED
@@ -53,18 +54,23 @@ class ScheduleController extends Controller
         return response()->json($schedules);
     }
 
-    public function store(Request $request)
+public function store(Request $request)
 {
-    $validated = $request->validate([
+    $rules = [
         'user_id' => 'required|exists:users,id',
         'role_id' => 'required|exists:volunteer_roles,id',
-        'date' => 'required|date',
         'start_time' => 'required|date_format:H:i',
         'end_time' => 'required|date_format:H:i|after:start_time',
         'location' => 'required|string|max:255'
-    ]);
+    ];
+    if ($this->getScheduleDateColumn() !== null) {
+        $rules['date'] = 'required|date';
+    }
+    $validated = $request->validate($rules);
 
-    $schedule = Schedule::create($validated);
+    $payload = $this->buildSchedulePayload($validated, $request);
+
+    $schedule = Schedule::create($payload);
 
     // ADDED
     $schedule->start_time = Carbon::parse($schedule->start_time)->format('h:i A');
@@ -76,20 +82,25 @@ class ScheduleController extends Controller
     ], 201);
 }
 
-    public function update(Request $request, $id)
+public function update(Request $request, $id)
 {
     $schedule = Schedule::findOrFail($id);
 
-    $validated = $request->validate([
+    $rules = [
         'user_id' => 'required|exists:users,id',
         'role_id' => 'required|exists:volunteer_roles,id',
-        'date' => 'required|date',
         'start_time' => 'required|date_format:H:i',
         'end_time' => 'required|date_format:H:i|after:start_time',
         'location' => 'required|string|max:255'
-    ]);
+    ];
+    if ($this->getScheduleDateColumn() !== null) {
+        $rules['date'] = 'required|date';
+    }
+    $validated = $request->validate($rules);
 
-    $schedule->update($validated);
+    $payload = $this->buildSchedulePayload($validated, $request);
+
+    $schedule->update($payload);
 
     // ADDED
     $schedule->start_time = Carbon::parse($schedule->start_time)->format('h:i A');
@@ -122,7 +133,7 @@ class ScheduleController extends Controller
     {
         $schedules = Schedule::where('user_id', $userId)
             ->with(['role:id,name', 'attendanceLogs'])
-            ->orderBy('date')
+            ->orderBy($this->getScheduleOrderColumn(), 'asc')
             ->get();
 
         // ADDED
@@ -145,7 +156,7 @@ class ScheduleController extends Controller
 
         $schedules = Schedule::where('role_id', $roleId)
             ->with(['volunteer:id,name,email'])
-            ->orderBy('date')
+            ->orderBy($this->getScheduleOrderColumn(), 'asc')
             ->get();
 
         // ADDED
@@ -156,5 +167,43 @@ class ScheduleController extends Controller
         });
 
         return response()->json($schedules);
+    }
+
+    private function getScheduleOrderColumn(): string
+    {
+        $dateColumn = $this->getScheduleDateColumn();
+        if ($dateColumn !== null) {
+            return $dateColumn;
+        }
+
+        if (Schema::hasColumn('schedules', 'start_time')) {
+            return 'start_time';
+        }
+
+        return 'created_at';
+    }
+
+    private function getScheduleDateColumn(): ?string
+    {
+        if (Schema::hasColumn('schedules', 'date')) {
+            return 'date';
+        }
+
+        if (Schema::hasColumn('schedules', 'scheduled_date')) {
+            return 'scheduled_date';
+        }
+
+        return null;
+    }
+
+    private function buildSchedulePayload(array $validated, Request $request): array
+    {
+        $payload = collect($validated)->except('date')->all();
+        $dateColumn = $this->getScheduleDateColumn();
+        if ($dateColumn !== null && $request->filled('date')) {
+            $payload[$dateColumn] = $request->input('date');
+        }
+
+        return $payload;
     }
 }

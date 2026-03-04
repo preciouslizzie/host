@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\AudioController;
 use App\Http\Controllers\MemberController;
+use App\Http\Controllers\WhatsAppLinkController;
 
 // Prefix all routes with "api"
 Route::prefix('api')->group(function () {
@@ -76,12 +77,9 @@ Route::prefix('api')->group(function () {
     Route::put('/audio/{id}', [AudioController::class, 'update']);
     Route::delete('/audio/{id}', [AudioController::class, 'destroy']);
 
-        // members
+    // members
 
     Route::get('/members', [MemberController::class, 'index']);
-    Route::post('/members', [MemberController::class, 'index']);
-    Route::put('/members/{id}', [MemberController::class, 'update']);
-    Route::delete('/members/{id}', [MemberController::class, 'destroy']);
 
         // Volunteer Features
         Route::get('/volunteer/roles',[VolunteerRoleController::class,'index']);
@@ -98,6 +96,7 @@ Route::prefix('api')->group(function () {
         Route::get('/volunteer/hours-summary',[VolunteerReportController::class,'hoursSummary']);
         Route::get('/volunteer/announcements', [AnnouncementController::class, 'unread']);
         Route::post('/volunteer/announcements/{id}/read', [AnnouncementController::class, 'markAsRead']);
+        Route::get('/whatsapp-links', [WhatsAppLinkController::class, 'index']);
 
     });
     
@@ -137,14 +136,18 @@ Route::prefix('api')->group(function () {
         Route::delete('/admin/groups/{id}/members', [DiscussionController::class, 'removeMembers']);
 
         // Volunteer Attendance & Reports
+        Route::get('/admin/members', [MemberController::class, 'index']);
+        Route::post('/admin/members', [MemberController::class, 'store']);
+        Route::put('/admin/members/{id}', [MemberController::class, 'update']);
+        Route::delete('/admin/members/{id}', [MemberController::class, 'destroy']);
         Route::get('/admin/volunteers', [AdminAuthController::class, 'getVolunteers']);
         Route::post('/admin/attendance', [VolunteerReportController::class, 'logAttendance']);
         Route::get('/admin/attendance', [VolunteerReportController::class, 'allAttendance']);
         Route::get('/admin/volunteers/{userId}/attendance', [VolunteerReportController::class, 'volunteerAttendance']);
         Route::get('/admin/volunteers/availability-report', [VolunteerReportController::class, 'availabilityReport']);
         Route::get('/admin/hours-summary', [VolunteerReportController::class, 'hoursReport']);
+        Route::post('/admin/whatsapp-links', [WhatsAppLinkController::class, 'store']);
 
         Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
     });
 });
-

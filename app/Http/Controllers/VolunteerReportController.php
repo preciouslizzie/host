@@ -127,13 +127,17 @@ class VolunteerReportController extends Controller
      * ADMIN: Get all volunteers attendance
      * GET /api/admin/attendance
      */
-    public function allAttendance()
+    public function allAttendance(Request $request)
     {
-        $attendance = AttendanceLog::with(['user:id,name,email', 'schedule:id,date,location'])
-            ->orderBy('created_at', 'desc')
-            ->paginate(20);
+        $query = AttendanceLog::with(['user:id,name,email', 'schedule:id,date,location'])
+            ->orderBy('created_at', 'desc');
 
-        return response()->json($attendance);
+        if ($request->boolean('paginate')) {
+            $perPage = (int) $request->input('per_page', 20);
+            return response()->json($query->paginate($perPage));
+        }
+
+        return response()->json($query->get());
     }
 
     /**

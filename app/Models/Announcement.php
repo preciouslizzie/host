@@ -6,7 +6,18 @@ use Illuminate\Database\Eloquent\Model;
 
 class Announcement extends Model
 {
-    protected $fillable = ['title','message','created_by'];
+    protected $fillable = [
+        'title',
+        'message',
+        'created_by',
+        'role_id',
+        'priority',
+        'target_roles',
+    ];
+
+    protected $casts = [
+        'target_roles' => 'array',
+    ];
 
     public function users()
     {
