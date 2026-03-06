@@ -33,15 +33,19 @@ class AnnouncementController extends Controller
     
     public function store(Request $request)
     {
-        $validated = $request->validate([
+        $input = $this->normalizeAnnouncementPayload($request);
+
+        $validated = validator($input, [
             'title' => 'required|string|max:255',
             'message' => 'required|string',
-            'volunteer_ids' => 'array|exists:users,id',
-            'user_ids' => 'array|exists:users,id',
+            'volunteer_ids' => 'array',
+            'volunteer_ids.*' => 'exists:users,id',
+            'user_ids' => 'array',
+            'user_ids.*' => 'exists:users,id',
             'target_roles' => 'nullable',
             'role_id' => 'nullable|exists:volunteer_roles,id',
             'priority' => 'nullable|in:low,normal,high',
-        ]);
+        ])->validate();
 
         $userId = Auth::id();
 
@@ -97,21 +101,25 @@ class AnnouncementController extends Controller
     {
         $announcement = Announcement::findOrFail($id);
 
-        $request->validate([
+        $input = $this->normalizeAnnouncementPayload($request);
+
+        $validated = validator($input, [
             'title' => 'required|string|max:255',
             'message' => 'required|string',
-            'volunteer_ids' => 'array|exists:users,id',
-            'user_ids' => 'array|exists:users,id',
-        ]);
+            'volunteer_ids' => 'array',
+            'volunteer_ids.*' => 'exists:users,id',
+            'user_ids' => 'array',
+            'user_ids.*' => 'exists:users,id',
+        ])->validate();
 
         $announcement->update([
-            'title' => $request->title,
-            'message' => $request->message
+            'title' => $validated['title'],
+            'message' => $validated['message']
         ]);
 
         // Update assigned users if provided (supports legacy volunteer_ids).
-        if ($request->has('user_ids') || $request->has('volunteer_ids')) {
-            $announcement->users()->sync($request->input('user_ids', $request->input('volunteer_ids', [])));
+        if (array_key_exists('user_ids', $validated) || array_key_exists('volunteer_ids', $validated)) {
+            $announcement->users()->sync($validated['user_ids'] ?? $validated['volunteer_ids'] ?? []);
         }
 
         return response()->json([
@@ -144,7 +152,8 @@ class AnnouncementController extends Controller
         $announcement = Announcement::findOrFail($id);
 
         $request->validate([
-            'volunteer_ids' => 'required|array|exists:users,id'
+            'volunteer_ids' => 'required|array',
+            'volunteer_ids.*' => 'exists:users,id',
         ]);
 
         $announcement->users()->sync($request->volunteer_ids);
@@ -155,19 +164,53 @@ class AnnouncementController extends Controller
         ]);
     }
 
-    public function unread()
+private function normalizeAnnouncementPayload(Request $request): array
+{
+    return [
+        'title' => $request->input('title', $request->input('subject')),
+        'message' => $request->input('message', $request->input('content', $request->input('body', $request->input('description')))),
+        'volunteer_ids' => $request->input('volunteer_ids', $request->input('volunteerIds')),
+        'user_ids' => $request->input('user_ids', $request->input('userIds')),
+        'target_roles' => $request->input('target_roles', $request->input('targetRoles')),
+        'role_id' => $request->input('role_id', $request->input('roleId')),
+        'priority' => $request->input('priority'),
+    ];
+}
+
+public function unread()
 {
     $user = auth()->user();
 
-    $announcements = Announcement::where(function ($query) use ($user) {
-        $query->whereNull('role_id')
-              ->orWhere('role_id', $user->role_id);
-    })
-    ->whereDoesntHave('reads', function ($q) use ($user) {
-        $q->where('volunteer_id', $user->id);
-    })
-    ->latest()
-    ->get();
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
+    }
+
+    $query = Announcement::query();
+
+    if (Schema::hasColumn('announcements', 'role_id') && !in_array($user->role, ['admin', 'super_admin'], true)) {
+        $roleIds = collect();
+        if (method_exists($user, 'volunteerRoles')) {
+            $roleIds = $user->volunteerRoles()->pluck('volunteer_roles.id');
+        }
+
+        $query->where(function ($q) use ($roleIds) {
+            $q->whereNull('role_id');
+            if ($roleIds->isNotEmpty()) {
+                $q->orWhereIn('role_id', $roleIds);
+            }
+        });
+    }
+
+    if (Schema::hasTable('announcement_reads') && Schema::hasColumn('announcement_reads', 'volunteer_id')) {
+        $query->whereDoesntHave('reads', function ($q) use ($user) {
+            $q->where('volunteer_id', $user->id);
+        });
+    }
+
+    $announcements = $query
+        ->with(['creator:id,name,email'])
+        ->latest()
+        ->get();
 
     return response()->json($announcements);
 }
@@ -176,9 +219,22 @@ public function markAsRead($id)
 {
     $user = auth()->user();
 
+    if (!$user) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
+    }
+
+    $announcement = Announcement::find($id);
+    if (!$announcement) {
+        return response()->json(['message' => 'Announcement not found'], 404);
+    }
+
+    if (!Schema::hasTable('announcement_reads') || !Schema::hasColumn('announcement_reads', 'volunteer_id')) {
+        return response()->json(['message' => 'Read tracking is not configured'], 500);
+    }
+
     AnnouncementRead::firstOrCreate(
         [
-            'announcement_id' => $id,
+            'announcement_id' => $announcement->id,
             'volunteer_id' => $user->id,
         ],
         [

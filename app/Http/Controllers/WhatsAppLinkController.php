@@ -14,16 +14,18 @@ class WhatsAppLinkController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
+        $payload = $this->normalizeStorePayload($request);
+
+        $validated = validator($payload, [
             'title' => 'required|string|max:255',
             'link' => 'required|url|max:1000',
-            'role_id' => 'required|exists:volunteer_roles,id',
-        ]);
+            'role_id' => 'nullable|exists:volunteer_roles,id',
+        ])->validate();
 
         $link = WhatsAppLink::create([
-            'title' => $request->title,
-            'link' => $request->link,
-            'role_id' => $request->role_id,
+            'title' => $validated['title'],
+            'link' => $validated['link'],
+            'role_id' => $validated['role_id'] ?? null,
             'created_by' => Auth::id(),
         ]);
 
@@ -56,5 +58,35 @@ class WhatsAppLinkController extends Controller
         $links = $query->latest()->get();
 
         return response()->json($links);
+    }
+
+    private function normalizeStorePayload(Request $request): array
+    {
+        $rawLink = $request->input('link', $request->input('url', $request->input('whatsapp_link')));
+
+        return [
+            'title' => $request->input('title'),
+            'link' => $this->normalizeLink($rawLink),
+            'role_id' => $request->input('role_id', $request->input('roleId')),
+        ];
+    }
+
+    private function normalizeLink($value): ?string
+    {
+        if (!is_string($value)) {
+            return $value;
+        }
+
+        $link = trim($value);
+
+        if ($link === '') {
+            return $link;
+        }
+
+        if (!preg_match('#^https?://#i', $link) && preg_match('#^(wa\.me|chat\.whatsapp\.com|api\.whatsapp\.com)/#i', $link)) {
+            return 'https://' . $link;
+        }
+
+        return $link;
     }
 }
