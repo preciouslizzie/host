@@ -11,7 +11,6 @@ class Announcement extends Model
         'message',
         'created_by',
         'role_id',
-        'priority',
         'target_roles',
     ];
 

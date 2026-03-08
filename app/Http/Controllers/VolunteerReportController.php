@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendanceLog;
 use App\Models\VolunteerAvailability;
-use App\Models\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -73,7 +72,6 @@ class VolunteerReportController extends Controller
             ->sum('hours_worked');
 
         $attendance = AttendanceLog::where('user_id', $userId)
-            ->with(['schedule:id,date,start_time,end_time,location'])
             ->orderBy('created_at', 'desc')
             ->paginate(20);
 
@@ -109,17 +107,21 @@ class VolunteerReportController extends Controller
      */
     public function logAttendance(Request $request)
     {
-        $request->validate([
-            'user_id' => 'required|exists:users,id',
-            'schedule_id' => 'required|exists:schedules,id',
-            'hours_worked' => 'required|numeric|min:0|max:24'
-        ]);
+        $input = [
+            'user_id' => $request->input('user_id', $request->input('userId')),
+            'hours_worked' => $request->input('hours_worked', $request->input('hoursWorked')),
+        ];
 
-        $attendance = AttendanceLog::create($request->validated());
+        $validated = validator($input, [
+            'user_id' => 'required|exists:users,id',
+            'hours_worked' => 'required|numeric|min:0|max:24'
+        ])->validate();
+
+        $attendance = AttendanceLog::create($validated);
 
         return response()->json([
             'message' => 'Attendance logged successfully',
-            'data' => $attendance->load(['schedule:id,date,location', 'user:id,name'])
+            'data' => $attendance->load(['user:id,name'])
         ], 201);
     }
 
@@ -129,7 +131,7 @@ class VolunteerReportController extends Controller
      */
     public function allAttendance(Request $request)
     {
-        $query = AttendanceLog::with(['user:id,name,email', 'schedule:id,date,location'])
+        $query = AttendanceLog::with(['user:id,name,email'])
             ->orderBy('created_at', 'desc');
 
         if ($request->boolean('paginate')) {
@@ -149,7 +151,7 @@ class VolunteerReportController extends Controller
         $totalHours = AttendanceLog::where('user_id', $userId)->sum('hours_worked');
 
         $attendance = AttendanceLog::where('user_id', $userId)
-            ->with(['schedule:id,date,start_time,end_time,location'])
+            ->with(['user:id,name,email'])
             ->orderBy('created_at', 'desc')
             ->get();
 

@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('attendance_logs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('user_id')->constrained();
-            $table->foreignId('schedule_id')->constrained();
             $table->decimal('hours_worked',5,2);
             $table->timestamps();
         });

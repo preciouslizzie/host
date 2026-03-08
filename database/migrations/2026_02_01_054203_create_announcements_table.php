@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('title');
             $table->text('message');
             $table->foreignId('role_id')->nullable()->constrained('volunteer_roles')->nullOnDelete();
-            $table->enum('priority', ['low', 'normal', 'high'])->default('normal');
             $table->timestamps();
         });
     }

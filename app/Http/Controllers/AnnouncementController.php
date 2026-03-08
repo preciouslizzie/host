@@ -44,7 +44,6 @@ class AnnouncementController extends Controller
             'user_ids.*' => 'exists:users,id',
             'target_roles' => 'nullable',
             'role_id' => 'nullable|exists:volunteer_roles,id',
-            'priority' => 'nullable|in:low,normal,high',
         ])->validate();
 
         $userId = Auth::id();
@@ -62,9 +61,6 @@ class AnnouncementController extends Controller
         }
         if (Schema::hasColumn('announcements', 'role_id') && array_key_exists('role_id', $validated)) {
             $payload['role_id'] = $validated['role_id'];
-        }
-        if (Schema::hasColumn('announcements', 'priority') && array_key_exists('priority', $validated)) {
-            $payload['priority'] = $validated['priority'] ?? 'normal';
         }
         if (Schema::hasColumn('announcements', 'target_roles')) {
             $targetRoles = $validated['target_roles'] ?? null;
@@ -166,15 +162,17 @@ class AnnouncementController extends Controller
 
 private function normalizeAnnouncementPayload(Request $request): array
 {
-    return [
+    $payload = [
         'title' => $request->input('title', $request->input('subject')),
         'message' => $request->input('message', $request->input('content', $request->input('body', $request->input('description')))),
         'volunteer_ids' => $request->input('volunteer_ids', $request->input('volunteerIds')),
         'user_ids' => $request->input('user_ids', $request->input('userIds')),
         'target_roles' => $request->input('target_roles', $request->input('targetRoles')),
         'role_id' => $request->input('role_id', $request->input('roleId')),
-        'priority' => $request->input('priority'),
     ];
+
+    // Keep optional fields out of validation when not provided.
+    return array_filter($payload, static fn ($value) => $value !== null);
 }
 
 public function unread()

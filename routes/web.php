@@ -23,7 +23,7 @@ Route::prefix('api')->group(function () {
             return DB::connection()->getDatabaseName();
         });
 
-    // ------------------- AUTH ROUTES -------------------
+    // Authentication Routes
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::middleware('auth:sanctum')->post('/admin/create-admin', [AdminAuthController::class, 'createAdmin']);
@@ -34,18 +34,20 @@ Route::prefix('api')->group(function () {
     Route::post('/admin/create-user', [AdminAuthController::class, 'createUser']);
     Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 
-    // ------------------- PASSWORD RESET -------------------
+    // -------------------- User Routes --------------------
+
+    // Authentication
     Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLink']);
     Route::post('/reset-password', [PasswordResetController::class, 'resetPassword']);
     Route::post('/login-with-token', [PasswordResetController::class, 'loginWithToken']);
 
-    // ------------------- PUBLIC ROUTES -------------------
+    // Public Routes
     Route::get('/blogs', [BlogController::class, 'index']);
     Route::get('/blog/{id}', [BlogController::class, 'show']);
     Route::get('/event', [EventController::class, 'index']);
     Route::get('/payment/callback', [PaymentController::class, 'callback'])->name('payment.callback');
 
-    // ------------------- PROTECTED ROUTES -------------------
+    // Authenticated Routes
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/dashboard', [AuthController::class, 'dashboard']);
         Route::post('/logout', [AuthController::class, 'logout']);
@@ -100,6 +102,8 @@ Route::prefix('api')->group(function () {
 
     });
     
+    // ------------------- ADMIN ROUTES -------------------
+
     Route::middleware('auth:sanctum', 'admin')->group(function () {
         // Volunteer Role Management
         Route::post('/admin/roles', [VolunteerRoleController::class, 'store']);
@@ -124,7 +128,6 @@ Route::prefix('api')->group(function () {
         Route::post('/admin/announcements', [AnnouncementController::class, 'store']);
         Route::put('/admin/announcements/{id}', [AnnouncementController::class, 'update']);
         Route::delete('/admin/announcements/{id}', [AnnouncementController::class, 'destroy']);
-        Route::post('/admin/announcements/{id}/assign-volunteers', [AnnouncementController::class, 'assignVolunteers']);
 
         // Discussion Group Management
         Route::get('/admin/groups', [DiscussionController::class, 'groups']);
@@ -135,7 +138,7 @@ Route::prefix('api')->group(function () {
         Route::post('/admin/groups/{id}/add-members', [DiscussionController::class, 'addMembers']);
         Route::delete('/admin/groups/{id}/members', [DiscussionController::class, 'removeMembers']);
 
-        // Volunteer Attendance & Reports
+        // Admin Management
         Route::get('/admin/members', [MemberController::class, 'index']);
         Route::post('/admin/members', [MemberController::class, 'store']);
         Route::put('/admin/members/{id}', [MemberController::class, 'update']);
